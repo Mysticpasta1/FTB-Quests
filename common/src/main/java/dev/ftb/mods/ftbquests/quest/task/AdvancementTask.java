@@ -30,6 +30,15 @@ public class AdvancementTask extends AbstractBooleanTask {
 		super(id, quest);
 	}
 
+	public AdvancementTask(long id, Quest quest, ResourceLocation advancementsId) {
+		super(id, quest);
+		advancement = advancementsId;
+	}
+
+	public ResourceLocation getId() {
+		return advancement;
+	}
+
 	@Override
 	public TaskType getType() {
 		return TaskTypes.ADVANCEMENT;
