@@ -8,18 +8,26 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import dev.architectury.registry.registries.RegistrarManager;
 import dev.ftb.mods.ftblibrary.config.Tristate;
+import dev.ftb.mods.ftblibrary.util.KnownServerRegistries;
 import dev.ftb.mods.ftbquests.FTBQuests;
+import dev.ftb.mods.ftbquests.events.QuestProgressEventData;
 import dev.ftb.mods.ftbquests.integration.PermissionsHelper;
 import dev.ftb.mods.ftbquests.net.*;
 import dev.ftb.mods.ftbquests.quest.*;
 import dev.ftb.mods.ftbquests.quest.loot.RewardTable;
 import dev.ftb.mods.ftbquests.quest.loot.WeightedReward;
+import dev.ftb.mods.ftbquests.quest.reward.AdvancementReward;
 import dev.ftb.mods.ftbquests.quest.reward.ItemReward;
+import dev.ftb.mods.ftbquests.quest.reward.XPReward;
+import dev.ftb.mods.ftbquests.quest.task.AdvancementTask;
 import dev.ftb.mods.ftbquests.quest.task.ItemTask;
 import dev.ftb.mods.ftbquests.quest.task.Task;
+import dev.ftb.mods.ftbquests.quest.task.XPTask;
 import dev.ftb.mods.ftbquests.util.ProgressChange;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementRewards;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -137,6 +145,9 @@ public class FTBQuestsCommands {
 				)
 				.then(Commands.literal("generate_chapter_with_all_items_in_game")
 						.executes(context -> generateAllItemChapter(context.getSource()))
+				)
+				.then(Commands.literal("generate_chapter_with_all_advancements")
+						.executes(context -> generateChapterFromAdvancements(context.getSource()))
 				)
 				.then(Commands.literal("reload")
 						.requires(FTBQuestsCommands::hasEditorPermission)
@@ -380,6 +391,106 @@ public class FTBQuestsCommands {
 		ServerQuestFile.INSTANCE.markDirty();
 		ServerQuestFile.INSTANCE.saveNow();
 		source.sendSuccess(() -> Component.literal("Done!"), false);
+		return 1;
+	}
+
+	private static int generateChapterFromAdvancements(CommandSourceStack source) {
+		Collection<Advancement> allAdvancements = source.getServer().getAdvancements().getAllAdvancements();
+
+		if (allAdvancements.isEmpty()) {
+			return 0;
+		}
+
+		int col = 0;
+		int row = 0;
+
+		String modid = allAdvancements.stream().toList().get(0).getId().getNamespace();
+		
+		for (Advancement advancements : allAdvancements) {
+			Chapter chapter = null;
+			//Be aware that recipes have advancements, we don't want to include those!
+			if (advancements.getParent() != null && advancements.getParent().getDisplay() != null 
+					&& !advancements.getParent().getId().getPath().contains("recipe")) {
+				ResourceLocation id = advancements.getParent().getId();
+				if (!modid.equals(id.getNamespace())) {
+					modid = id.getNamespace();
+					long newId = ServerQuestFile.INSTANCE.newID();
+					chapter = new Chapter(newId, ServerQuestFile.INSTANCE, ServerQuestFile.INSTANCE.getDefaultChapterGroup());
+					chapter.onCreated();
+					chapter.setRawTitle("Generated chapter with advancements from " + modid);
+					chapter.setRawIcon(new ItemStack(Items.COMPASS));
+					chapter.setDefaultQuestShape("rsquare");
+					new CreateObjectResponseMessage(chapter, null).sendToAll(source.getServer());
+				}
+
+				if (col >= 20) {
+					col = 0;
+					row++;
+				}
+
+				if (chapter != null) {
+					Quest quest = new Quest(chapter.file.newID(), chapter);
+					quest.onCreated();
+					quest.setX(col);
+					quest.setY(row);
+					quest.setRawIcon(advancements.getParent().getDisplay().getIcon());
+					quest.setRawSubtitle(advancements.getParent().getDisplay().getDescription().getString());
+					quest.setRawTitle(advancements.getParent().getDisplay().getTitle().getString());
+
+					for (Advancement child : advancements.getChildren()) {
+						if (child != null && child.getDisplay() != null && !child.getId().getPath().contains("recipe")) {
+							if (!child.getId().getNamespace().equals(modid)) {
+								modid = id.getNamespace();
+								long newId = ServerQuestFile.INSTANCE.newID();
+								chapter = new Chapter(newId, ServerQuestFile.INSTANCE, ServerQuestFile.INSTANCE.getDefaultChapterGroup());
+								chapter.onCreated();
+								chapter.setRawTitle("Generated chapter with advancements from " + modid);
+								chapter.setRawIcon(new ItemStack(Items.COMPASS));
+								chapter.setDefaultQuestShape("rsquare");
+								new CreateObjectResponseMessage(chapter, null).sendToAll(source.getServer());
+							}
+							
+							Quest quest2 = new Quest(chapter.file.newID(), chapter);
+							quest2.setX(col++);
+							quest2.setY(row);
+							quest2.setRawIcon(child.getDisplay().getIcon());
+							quest2.setRawSubtitle(child.getDisplay().getDescription().getString());
+							quest2.setRawTitle(child.getDisplay().getTitle().getString());
+							
+							for(Quest quest1 : chapter.getQuests()) {
+								if (quest2 != quest1) {
+									quest.addDependency(quest2);
+								} else {
+									quest.addDependency(quest1);
+								}
+							}
+						}
+					}
+
+					new CreateObjectResponseMessage(quest, null).sendToAll(source.getServer());
+
+					AdvancementTask task = new AdvancementTask(chapter.file.newID(), quest, advancements.getId());
+					task.onCreated();
+
+					XPReward reward = new XPReward(chapter.file.newID(), quest, 200);
+					reward.onCreated();
+
+					CompoundTag extra = new CompoundTag();
+					extra.putString("type", task.getType().getTypeForNBT());
+					new CreateObjectResponseMessage(task, extra).sendToAll(source.getServer());
+
+					CompoundTag extra2 = new CompoundTag();
+					extra2.putString("type", reward.getType().getTypeForNBT());
+					new CreateObjectResponseMessage(reward, extra2).sendToAll(source.getServer());
+					col++;
+				}
+			}
+		}
+
+		ServerQuestFile.INSTANCE.markDirty();
+		ServerQuestFile.INSTANCE.saveNow();
+		source.sendSuccess(() -> Component.literal("Done!"), false);
+		doReload(source); //Reload to set the reward correctly!
 		return 1;
 	}
 
