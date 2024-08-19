@@ -405,11 +405,11 @@ public class FTBQuestsCommands {
 		int row = 0;
 
 		String modid = allAdvancements.stream().toList().get(0).getId().getNamespace();
-
+		
 		for (Advancement advancements : allAdvancements) {
 			Chapter chapter = null;
 			//Be aware that recipes have advancements, we don't want to include those!
-			if (advancements.getParent() != null && advancements.getParent().getDisplay() != null
+			if (advancements.getParent() != null && advancements.getParent().getDisplay() != null 
 					&& !advancements.getParent().getId().getPath().contains("recipe")) {
 				ResourceLocation id = advancements.getParent().getId();
 				if (!modid.equals(id.getNamespace())) {
@@ -449,14 +449,14 @@ public class FTBQuestsCommands {
 								chapter.setDefaultQuestShape("rsquare");
 								new CreateObjectResponseMessage(chapter, null).sendToAll(source.getServer());
 							}
-
+							
 							Quest quest2 = new Quest(chapter.file.newID(), chapter);
 							quest2.setX(col++);
 							quest2.setY(row);
 							quest2.setRawIcon(child.getDisplay().getIcon());
 							quest2.setRawSubtitle(child.getDisplay().getDescription().getString());
 							quest2.setRawTitle(child.getDisplay().getTitle().getString());
-
+							
 							for(Quest quest1 : chapter.getQuests()) {
 								if (quest2 != quest1) {
 									quest.addDependency(quest2);
