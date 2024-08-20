@@ -404,17 +404,22 @@ public class FTBQuestsCommands {
 		int col = 0;
 		int row = 0;
 
-		String modid = allAdvancements.stream().toList().get(0).getId().getNamespace();
+		String modid = "minecraft";
+
+		long newId = ServerQuestFile.INSTANCE.newID();
+		Chapter chapter = new Chapter(newId, ServerQuestFile.INSTANCE, ServerQuestFile.INSTANCE.getDefaultChapterGroup());
+		chapter.onCreated();
+		chapter.setRawTitle("Generated chapter with advancements from " + modid);
+		chapter.setRawIcon(new ItemStack(Items.COMPASS));
+		chapter.setDefaultQuestShape("rsquare");
+		new CreateObjectResponseMessage(chapter, null).sendToAll(source.getServer());
 		
 		for (Advancement advancements : allAdvancements) {
-			Chapter chapter = null;
 			//Be aware that recipes have advancements, we don't want to include those!
-			if (advancements.getParent() != null && advancements.getParent().getDisplay() != null 
-					&& !advancements.getParent().getId().getPath().contains("recipe")) {
-				ResourceLocation id = advancements.getParent().getId();
+			if (!advancements.getId().getPath().contains("recipe")) {
+				ResourceLocation id = advancements.getId();
 				if (!modid.equals(id.getNamespace())) {
 					modid = id.getNamespace();
-					long newId = ServerQuestFile.INSTANCE.newID();
 					chapter = new Chapter(newId, ServerQuestFile.INSTANCE, ServerQuestFile.INSTANCE.getDefaultChapterGroup());
 					chapter.onCreated();
 					chapter.setRawTitle("Generated chapter with advancements from " + modid);
@@ -428,42 +433,18 @@ public class FTBQuestsCommands {
 					row++;
 				}
 
-				if (chapter != null) {
+				if (advancements.getDisplay() != null) {
 					Quest quest = new Quest(chapter.file.newID(), chapter);
 					quest.onCreated();
 					quest.setX(col);
 					quest.setY(row);
-					quest.setRawIcon(advancements.getParent().getDisplay().getIcon());
-					quest.setRawSubtitle(advancements.getParent().getDisplay().getDescription().getString());
-					quest.setRawTitle(advancements.getParent().getDisplay().getTitle().getString());
+					quest.setRawIcon(advancements.getDisplay().getIcon());
+					quest.setRawSubtitle(advancements.getDisplay().getDescription().getString());
+					quest.setRawTitle(advancements.getDisplay().getTitle().getString());
 
 					for (Advancement child : advancements.getChildren()) {
-						if (child != null && child.getDisplay() != null && !child.getId().getPath().contains("recipe")) {
-							if (!child.getId().getNamespace().equals(modid)) {
-								modid = id.getNamespace();
-								long newId = ServerQuestFile.INSTANCE.newID();
-								chapter = new Chapter(newId, ServerQuestFile.INSTANCE, ServerQuestFile.INSTANCE.getDefaultChapterGroup());
-								chapter.onCreated();
-								chapter.setRawTitle("Generated chapter with advancements from " + modid);
-								chapter.setRawIcon(new ItemStack(Items.COMPASS));
-								chapter.setDefaultQuestShape("rsquare");
-								new CreateObjectResponseMessage(chapter, null).sendToAll(source.getServer());
-							}
-							
-							Quest quest2 = new Quest(chapter.file.newID(), chapter);
-							quest2.setX(col++);
-							quest2.setY(row);
-							quest2.setRawIcon(child.getDisplay().getIcon());
-							quest2.setRawSubtitle(child.getDisplay().getDescription().getString());
-							quest2.setRawTitle(child.getDisplay().getTitle().getString());
-							
-							for(Quest quest1 : chapter.getQuests()) {
-								if (quest2 != quest1) {
-									quest.addDependency(quest2);
-								} else {
-									quest.addDependency(quest1);
-								}
-							}
+						for (Quest quest2 : chapter.getQuests()) {
+							quest.addDependency(quest2);
 						}
 					}
 
