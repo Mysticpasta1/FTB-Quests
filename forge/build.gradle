@@ -30,6 +30,13 @@ dependencies {
 	modApi("dev.ftb.mods:ftb-library-forge:${rootProject.ftb_library_version}") { transitive false }
 	modApi("dev.ftb.mods:ftb-teams-forge:${rootProject.ftb_teams_version}") { transitive false }
 
+	modRuntimeOnly("curse.maven:atlantis-355418:5578314")
+	modRuntimeOnly("curse.maven:cloth-config-348521:4973441")
+	modRuntimeOnly('software.bernie.geckolib:geckolib-forge-1.20.1:4.2.2')
+	modRuntimeOnly("curse.maven:justhammers-681606:4995650")
+
+
+
 	common(project(path: ":common", configuration: "namedElements")) { transitive false }
 	shadowCommon(project(path: ":common", configuration: "transformProductionForge")) { transitive false }
 }

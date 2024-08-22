@@ -62,6 +62,18 @@ allprojects {
 				includeGroup "dev.ftb.mods"
 			}
 		}
+
+		maven {
+			url "https://cursemaven.com"
+			content {
+				includeGroup "curse.maven"
+			}
+		}
+
+		maven {
+			name = 'GeckoLib'
+			url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+		}
 	}
 
 	java {
